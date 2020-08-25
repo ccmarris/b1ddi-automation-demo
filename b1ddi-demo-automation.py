@@ -45,7 +45,7 @@
 
 ------------------------------------------------------------------------------------------------------------
 '''
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -174,7 +174,7 @@ def read_demo_ini(ini_filename):
     config = {}
     ini_keys = [ 'owner', 'customer', 'postfix', 'tld', 'dns_view', 
                 'dns_domain', 'no_of_records', 'ip_space', 'base_net', 
-                'no_of_networks', 'container_cidr', 'cidr' ]
+                'no_of_networks', 'no_of_ips', 'container_cidr', 'cidr' ]
 
     # Attempt to read api_key from ini file
     try:
@@ -291,7 +291,8 @@ def create_networks(b1ddi, config):
                 + '"space": "' + space + '", '
                 + tag_body + ' }' )
         log.debug("Body:{}".format(body))
-        log.info("Creating Addresses block {}/{}".format(base_net, cidr))
+        log.info("~~~~ Creating Addresses block {}/{}~~~~ "
+                .format(base_net, cidr))
         response = b1ddi.create('/ipam/address_block', body=body)
 
         if response.status_code in b1ddi.return_codes_ok:
@@ -307,7 +308,7 @@ def create_networks(b1ddi, config):
                 log.warn("Address block only supports {} subnets".format(nets))
             else:
                 nets = int(config['no_of_networks'])
-            log.info("Creating {} subnets".format(nets))
+            log.info("~~~~ Creating {} subnets ~~~~".format(nets))
             for n in range(nets):
                 address = str(subnet_list[n].network_address)
                 body = ( '{ "address": "' + address + '", '
@@ -381,8 +382,8 @@ def populate_network(b1ddi, config, space, network):
 
     no_of_ips = int(range_size / 2)
     # If number requested is lt than caluculated use configured
-    if config['no_of_ips'] < no_of_ips:
-        no_of_ips = config['no_of_ips']
+    if int(config['no_of_ips']) < no_of_ips:
+        no_of_ips = int(config['no_of_ips'])
     log.info("~~~~ Creating {} IPs ~~~~".format(no_of_ips))
     ips = list(network.hosts())
     for ip in range(1, no_of_ips):
