@@ -12,7 +12,7 @@
 
  Author: Chris Marrison
 
- Date Last Updated: 20200824
+ Date Last Updated: 20200825
 
  Todo:
     [ ] Too much to list
@@ -45,7 +45,7 @@
 
 ------------------------------------------------------------------------------------------------------------
 '''
-__version__ = '0.0.8'
+__version__ = '0.1.0'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -320,10 +320,11 @@ def create_networks(b1ddi, config):
 
                 if response.status_code in b1ddi.return_codes_ok:
                     log.info("+++ Subnet {}/{} successfully created".format(address, cidr))
-                    # create_range(b1ddi, config, space, subnet_list[n])
-                    # create_ips(b1ddi, config, subnet_list[n])
-
-                    status = True
+                    if populate_network(b1ddi, config, space, subnet_list[n]):
+                        log.info("+++ Networks populated.")
+                        status = True
+                    else:
+                        log.warning("Issues populating networks")
                 else:
                     log.warning("--- Subnet {}/{} not created".format(network, cidr))
                     log.debug("Return code: {}".format(response.status_code))
@@ -339,10 +340,9 @@ def create_networks(b1ddi, config):
     return status
 
 
-"""
-def create_range(b1ddi, config, space, network):
+def populate_network(b1ddi, config, space, network):
     '''
-    Create DHCP Range
+    Create DHCP Range and IPs
 
     Parameters:
         b1ddi (obj): bloxone.b1ddi object
@@ -356,22 +356,54 @@ def create_range(b1ddi, config, space, network):
 
     log.info("~~~~ Creating Range ~~~~")
     tag_body = create_tag_body(config['owner'])
-    body = '{ "name": "' + config['ip_space'] + '",' + tag_body +' }'
+
+    net_size = network.num_addresses
+    range_size = int(net_size / 2)
+    broadcast = network.broadcast_address
+    start_ip = str(broadcast - (range_size + 1))
+    end_ip = str(broadcast - 1)
+
+    body = ( '{ "start": "' + start_ip + '", "end": "' + end_ip +
+            '", "space": "' + space + '", '  + tag_body + ' }' )
     log.debug("Body:{}".format(body))
 
-    log.info("Creating Range {}".format(config['ip_space']))
-        response = b1ddi.create('/ipam/ip_space', body=body)
+    log.info("Creating Range start: {}, end: {}".format(start_ip, end_ip))
+    response = b1ddi.create('/ipam/range', body=body)
+    if response.status_code in b1ddi.return_codes_ok:
+        log.info("+++ Range created in network {}".format(str(network)))
+        status = True
+    else:
+        log.warning("--- Range for network {} not created".format(str(network)))
+        log.debug("Return code: {}".format(response.status_code))
+        log.debug("Return body: {}".format(response.text))
+
+    # Add reservations
+
+    no_of_ips = int(range_size / 2)
+    # If number requested is lt than caluculated use configured
+    if config['no_of_ips'] < no_of_ips:
+        no_of_ips = config['no_of_ips']
+    log.info("~~~~ Creating {} IPs ~~~~".format(no_of_ips))
+    ips = list(network.hosts())
+    for ip in range(1, no_of_ips):
+        address = str(ips[ip])
+        body = ( '{ "address": "' + address + '", "space": "' 
+                + space + '", '  + tag_body + ' }' )
+        log.debug("Body:{}".format(body))
+
+        log.info("Creating IP Reservation: {}".format(address))
+        response = b1ddi.create('/ipam/address', body=body)
         if response.status_code in b1ddi.return_codes_ok:
-            log.info("IP_Space {} Created".format(config['ip_space']))
+            log.info("+++ IP {} created".format(address))
             status = True
         else:
-            log.warning("IP Space {} not created".format(config['ip_space']))
+            log.warning("--- IP {} not created".format(address))
             log.debug("Return code: {}".format(response.status_code))
             log.debug("Return body: {}".format(response.text))
-    else: 
+            status = False
 
     return status
-"""
+
 
 def create_ips(b1ddi, config, space, network):
     '''
@@ -527,8 +559,8 @@ def check_config(config):
     if not bloxone.utils.validate_ip(config['base_net']):
         log.error("Base network not valid: {}".format(config['base_net']))
         config_ok = False
-    elif container < 8 or container > 30:
-        log.error("Container CIDR should be between 8 and 30: {}"
+    elif container < 8 or container > 28:
+        log.error("Container CIDR should be between 8 and 28: {}"
                   .format(container))
         config_ok = False
     elif container >= subnet:
@@ -536,7 +568,7 @@ def check_config(config):
                   .format(container, subnet))
         config_ok = False
     elif subnet > 29:
-        log.error("Subnet CIDR should be /29 or smaller: {}".format(subnet))
+        log.error("Subnet CIDR should be /29 or shorter: {}".format(subnet))
         config_ok = False
 
     return config_ok
