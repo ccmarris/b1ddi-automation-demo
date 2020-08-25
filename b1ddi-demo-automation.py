@@ -12,7 +12,7 @@
 
  Author: Chris Marrison
 
- Date Last Updated: 20200822
+ Date Last Updated: 20200824
 
  Todo:
     [ ] Too much to list
@@ -45,7 +45,7 @@
 
 ------------------------------------------------------------------------------------------------------------
 '''
-__version__ = '0.0.5'
+__version__ = '0.0.8'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -57,6 +57,7 @@ import bloxone
 import argparse
 import configparser
 import datetime
+import ipaddress
 
 
 # Global Variables
@@ -171,9 +172,9 @@ def read_demo_ini(ini_filename):
     # Local Variables
     cfg = configparser.ConfigParser()
     config = {}
-    ini_keys = ['owner', 'customer', 'postfix', 'tld', 'dns_view', 
-                'dns_domain', 'no_of_records', 'ip_space', 'no_of_networks', 
-                'container_cidr', 'cidr' ]
+    ini_keys = [ 'owner', 'customer', 'postfix', 'tld', 'dns_view', 
+                'dns_domain', 'no_of_records', 'ip_space', 'base_net', 
+                'no_of_networks', 'container_cidr', 'cidr' ]
 
     # Attempt to read api_key from ini file
     try:
@@ -260,6 +261,84 @@ def ip_space(b1ddi, config):
     return status
 
 
+def create_networks(b1ddi, config):
+    '''
+    Create Subnets
+
+    Parameters:
+        b1ddi (obj): bloxone.b1ddi object
+        config (obj): ini config object
+    
+    Returns:
+        status (bool): True if successful
+    '''
+    status = False
+
+    # Get id of ip_space
+    log.info("---- Create Address Block and subnets ----")
+    space = b1ddi.get_id('/ipam/ip_space', key="name", 
+                        value=config['ip_space'], include_path=True)
+    if space:
+        log.info("IP Space id found: {}".format(space))
+
+        tag_body = create_tag_body(config['owner'])
+        base_net = config['base_net']
+
+        # Create subnets
+        cidr = config['container_cidr']
+        body = ( '{ "address": "' + base_net + '", '
+                + '"cidr": "' + cidr + '", '
+                + '"space": "' + space + '", '
+                + tag_body + ' }' )
+        log.debug("Body:{}".format(body))
+        log.info("Creating Addresses block {}/{}".format(base_net, cidr))
+        response = b1ddi.create('/ipam/address_block', body=body)
+
+        if response.status_code in b1ddi.return_codes_ok:
+            log.info("+++ Address block {}/{} created".format(base_net, cidr))
+
+            # Create subnets
+            network = ipaddress.ip_network(base_net + '/' + cidr)
+            # Reset cidr for subnets
+            cidr = config['cidr']
+            subnet_list = list(network.subnets(new_prefix=int(cidr)))
+            if len(subnet_list) < int(config['no_of_networks']):
+                nets = len(subnet_list)
+                log.warn("Address block only supports {} subnets".format(nets))
+            else:
+                nets = int(config['no_of_networks'])
+            log.info("Creating {} subnets".format(nets))
+            for n in range(nets):
+                address = str(subnet_list[n].network_address)
+                body = ( '{ "address": "' + address + '", '
+                        + '"cidr": "' + cidr + '", '
+                        + '"space": "' + space + '", '
+                        + tag_body + ' }' )
+                log.debug("Body:{}".format(body))
+                log.info("Creating Subnet {}/{}".format(address, cidr))
+                response = b1ddi.create('/ipam/subnet', body=body)
+
+                if response.status_code in b1ddi.return_codes_ok:
+                    log.info("+++ Subnet {}/{} successfully created".format(address, cidr))
+                    # create_range(b1ddi, config, space, subnet_list[n])
+                    # create_ips(b1ddi, config, subnet_list[n])
+
+                    status = True
+                else:
+                    log.warning("--- Subnet {}/{} not created".format(network, cidr))
+                    log.debug("Return code: {}".format(response.status_code))
+                    log.debug("Return body: {}".format(response.text))
+
+        else:
+            log.warning("--- Address Block {}/{} not created".format(base_net, cidr))
+            log.debug("Return code: {}".format(response.status_code))
+            log.debug("Return body: {}".format(response.text))
+    else:
+        log.warning("IP Space {} does not exist".format(config['ip_space']))
+
+    return status
+
+
 """
 def create_range(b1ddi, config, space, network):
     '''
@@ -310,69 +389,6 @@ def create_ips(b1ddi, config, space, network):
 
     return
 
-
-def create_networks(b1ddi, config, base_net="192.168"):
-    '''
-    Create Subnets
-
-    Parameters:
-        b1ddi (obj): bloxone.b1ddi object
-        config (obj): ini config object
-    
-    Returns:
-        status (bool): True if successful
-    '''
-    status = False
-    create_block = True
-
-    # Get id of ip_space
-    log.info("---- Create Address Block and subnets ----")
-    space = b1ddi.get_id('/ipam/ip_space', key="name", 
-                        value=config['ip_space'], include_path=True)
-    if space:
-        log.info("IP Space id found: {}".format(space))
-
-        tag_body = create_tag_body(config['owner'])
-
-        for n in (range(int(config['no_of_networks']))):
-            network = base_net + "." + str(n) + ".0"
-            if create_block:
-                cidr = config['container_cidr']
-                body = ( '{ "address": "' + network + '", '
-                        + '"cidr": "' + cidr + '", '
-                        + '"space": "' + space + '", '
-                        + tag_body + ' }' )
-                log.debug("Body:{}".format(body))
-                log.info("Creating Addresses block {}/{}".format(network, cidr))
-                response = b1ddi.create('/ipam/address_block', body=body)
-            else:
-                cidr = config['cidr']
-                body = ( '{ "address": "' + network + '", '
-                        + '"cidr": "' + cidr + '", '
-                        + '"space": "' + space + '", '
-                        + tag_body + ' }' )
-                log.debug("Body:{}".format(body))
-                log.info("Creating Subnet {}/{}".format(network, cidr))
-                response = b1ddi.create('/ipam/subnet', body=body)
-
-            if response.status_code in b1ddi.return_codes_ok:
-                if create_block:
-                    log.info("+++ Address block {}/{} created".format(network, cidr))
-                    create_block = False
-                else:
-                    log.info("+++ Subnet {}/{} successfully created".format(network, cidr))
-                    # create_range(b1ddi, config, space, network)
-                    # create_ips(b1ddi, config, network)
-
-                status = True
-            else:
-                log.warning("--- Subnet {}/{} not created".format(network, cidr))
-                log.debug("Return code: {}".format(response.status_code))
-                log.debug("Return body: {}".format(response.text))
-    else:
-        log.warning("IP Space {} does not exist".format(config['ip_space']))
-
-    return status
 
 
 def create_hosts(b1ddi, config):
@@ -494,6 +510,37 @@ def clean_up(b1ddi, config):
     return exitcode
 
 
+def check_config(config):
+    '''
+    Perform some basic network checks on config
+
+    Parameters:
+        config (dict): Config Dictionary
+    
+    Returns:
+        config_ok (bool): True if all good
+    '''
+    config_ok = True
+    container = int(config['container_cidr'])
+    subnet = int(config['cidr'])
+
+    if not bloxone.utils.validate_ip(config['base_net']):
+        log.error("Base network not valid: {}".format(config['base_net']))
+        config_ok = False
+    elif container < 8 or container > 30:
+        log.error("Container CIDR should be between 8 and 30: {}"
+                  .format(container))
+        config_ok = False
+    elif container >= subnet:
+        log.error("Container prefix does not contain subnet prefix: {} vs {}"
+                  .format(container, subnet))
+        config_ok = False
+    elif subnet > 29:
+        log.error("Subnet CIDR should be /29 or smaller: {}".format(subnet))
+        config_ok = False
+
+    return config_ok
+
 def main():
     '''
     Core Logic
@@ -533,8 +580,14 @@ def main():
         b1ddi = bloxone.b1ddi(inifile)
 
         if not args.remove:
-            log.info("------ Creating Demo Data ------")
-            exitcode = create_demo(b1ddi, config)
+            log.info("Checking config...")
+            if check_config(config):
+                log.info("Config checked out proceeding...")
+                log.info("------ Creating Demo Data ------")
+                exitcode = create_demo(b1ddi, config)
+            else:
+                log.error("Config {} contains errors".format(inifile))
+                exitcode = 3
         elif args.remove:
             log.info("------ Cleaning Up Demo Data ------")
             exitcode = clean_up(b1ddi, config)
