@@ -12,7 +12,7 @@
 
  Author: Chris Marrison
 
- Date Last Updated: 20200825
+ Date Last Updated: 20200909
 
  Todo:
     [ ] Too much to list
@@ -45,7 +45,7 @@
 
 ------------------------------------------------------------------------------------------------------------
 '''
-__version__ = '0.1.1'
+__version__ = '0.2.0'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -173,7 +173,7 @@ def read_demo_ini(ini_filename):
     cfg = configparser.ConfigParser()
     config = {}
     ini_keys = [ 'owner', 'customer', 'postfix', 'tld', 'dns_view', 
-                'dns_domain', 'no_of_records', 'ip_space', 'base_net', 
+                'dns_domain', 'nsg', 'no_of_records', 'ip_space', 'base_net', 
                 'no_of_networks', 'no_of_ips', 'container_cidr', 'cidr' ]
 
     # Attempt to read api_key from ini file
@@ -211,15 +211,17 @@ def create_tag_body(owner, **params):
     '''
     now = datetime.datetime.now()  
     datestamp = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+    tags = {}
+    tags.update({"Owner": owner})
+    tags.update({"Usage": "AUTOMATION DEMO"})
+    tags.update({"Created": datestamp})
+
 
     if params:
-        tags = params
-        tags.update({"Owner": owner})
-        tags.update({"Created": datestamp})
-        tag_body = '"tags":' + str(tags) 
+        tags.update(**params)
+        tag_body = '"tags":' + json.dumps(tags) 
     else:
-        tag_body = ( '"tags": { "Owner" : "' + owner + 
-                    '", "Created": "' +  datestamp + '" }' )
+        tag_body = '"tags":' + json.dumps(tags) 
     
     log.debug("Tag body: {}".format(tag_body))
 
@@ -322,10 +324,10 @@ def create_networks(b1ddi, config):
                 if response.status_code in b1ddi.return_codes_ok:
                     log.info("+++ Subnet {}/{} successfully created".format(address, cidr))
                     if populate_network(b1ddi, config, space, subnet_list[n]):
-                        log.info("+++ Networks populated.")
+                        log.info("+++ Network populated.")
                         status = True
                     else:
-                        log.warning("Issues populating networks")
+                        log.warning("--- Issues populating network")
                 else:
                     log.warning("--- Subnet {}/{} not created".format(network, cidr))
                     log.debug("Return code: {}".format(response.status_code))
@@ -406,21 +408,26 @@ def populate_network(b1ddi, config, space, network):
     return status
 
 
-def create_ips(b1ddi, config, space, network):
+def populate_dns(b1ddi, config):
     '''
-    Create Fixed Addrs
+    Populate DNS View with zones/records
 
     Parameters:
         b1ddi (obj): bloxone.b1ddi object
         config (obj): ini config object
-        network (str): Network base address
+        view (str): Network base address
     
     Returns:
-        status (bool): True if successful
+        bool: True if successful
     '''
     status = False
 
-    return
+    if create_zones(b1ddi, config):
+        status = True
+    else:
+        status = False
+
+    return status
 
 
 
@@ -433,10 +440,11 @@ def create_hosts(b1ddi, config):
         config (obj): ini config object
     
     Returns:
-        status (bool): True if successful
+        bool: True if successful
     '''
     status = False
-    return
+
+    return status
 
 
 def create_zones(b1ddi, config):
@@ -451,7 +459,71 @@ def create_zones(b1ddi, config):
         status (bool): True if successful
     '''
     status = False
-    return
+
+    # Get id of DNS view
+    log.info("---- Create Forward & Reverse Zones ----")
+    view = b1ddi.get_id('/dns/view', key="name", 
+                        value=config['dns_view'], include_path=True)
+    if view:
+        log.info("DNS View id found: {}".format(view))
+        # Check for NSG
+        nsg = b1ddi.get_id('/dns/auth_nsg', 
+                            key="name", 
+                            value="marrison-auto-demo", 
+                            include_path=True)
+        if nsg:
+            # Prepare Body
+            tag_body = create_tag_body(config['owner'])
+            zone = config['dns_domain']
+            body = ( '{ "fqdn": "' + zone + '", "view": "' + view + '", ' 
+                    + '"nsgs": ["' + nsg + '"], '
+                    + '"primary_type": "cloud", '
+                    + tag_body + ' }' )
+            # Create zone
+            response = b1ddi.create('/dns/auth_zone', body)
+            if response.status_code in b1ddi.return_codes_ok:
+                log.info("+++ Zone {} created in view".format(zone))
+            else:
+                # Log error
+                log.warning("--- Zone {} in view {} not created"
+                            .format(zone, config['dns_view']))
+                log.debug("Return code: {}".format(response.status_code))
+                log.debug("Return body: {}".format(response.text))
+
+            # Work out reverse /16 for network  
+            r_network = bloxone.utils.reverse_labels(config['base_net'])
+            # Remove "last" two octets
+            r_network = bloxone.utils.get_domain(r_network, no_of_labels=2)
+            zone = r_network + '.in-addr.arpa.'
+            body = ( '{ "fqdn": "' + zone + '", "view": "' + view + '", ' 
+                    + '"nsgs": ["' + nsg + '"], '
+                    + '"primary_type": "cloud", '
+                    + tag_body + ' }' )
+
+            # Create reverse zone
+            response = b1ddi.create('/dns/auth_zone', body)
+            if response.status_code in b1ddi.return_codes_ok:
+                log.info("+++ Zone {} created in view".format(zone))
+            else:
+                # Log error
+                log.warning("--- Zone {} in view {} not created"
+                            .format(zone, config['dns_view']))
+                log.debug("Return code: {}".format(response.status_code))
+                log.debug("Return body: {}".format(response.text))
+
+            # Add Records to zones
+            if add_records(b1ddi, config):
+                log.info("+++ Records added to zones")
+                status = True
+            else:
+                log.warning("--- Failed to add records")
+                status = False
+        else:
+            log.warning("NSG {} not found. Cannot create zones."
+                        .format(config['nsg']))
+            status = False
+
+    return status
 
 
 def create_dnsview(b1ddi, config):
@@ -463,25 +535,132 @@ def create_dnsview(b1ddi, config):
         config (obj): ini config object
     
     Returns:
-        status (bool): True if successful
+        bool: True if successful
     '''
     status = False
-    return
+
+    # Check for existence
+    if not b1ddi.get_id('/dns/view', key="name", value=config['dns_view']):
+        log.info("---- Create DNS View ----")
+        tag_body = create_tag_body(config['owner'])
+        body = '{ "name": "' + config['dns_view'] + '",' + tag_body +' }'
+        log.debug("Body:{}".format(body))
+
+        log.info("Creating DNS View {}".format(config['dns_view']))
+        response = b1ddi.create('/dns/view', body=body)
+        if response.status_code in b1ddi.return_codes_ok:
+            log.info("DNS View {} Created".format(config['dns_view']))
+            status = True
+        else:
+            log.warning("DNS View {} not created".format(config['dns_view']))
+            log.debug("Return code: {}".format(response.status_code))
+            log.debug("Return body: {}".format(response.text))
+    else:
+        log.warning("DNS View {} already exists".format(config['dns_view']))
+   
+    return status
 
 
-def create_other(b1ddi, config):
+def add_records(b1ddi, config):
     '''
-    Create Other
+    Add records to zone
 
     Parameters:
         b1ddi (obj): bloxone.b1ddi object
-        config (obj): ini config object
+        zone (str): Name of zone
+        view
+        no_of_records (int): number of records to create
+        type (str): Record type
     
     Returns:
-        status (bool): True if successful
+        bool: True if successful
     '''
     status = False
-    return
+    zone_id = ''
+    zone = config['dns_domain']
+
+    view = b1ddi.get_id('/dns/view', key="name", 
+                        value=config['dns_view'], include_path=True)
+    if view:
+        filter = ( '(fqdn=="' + zone + '")and(view=="' + view + '")' )
+        # Get zone id
+        response  = b1ddi.get('/dns/auth_zone', 
+                                _filter=filter, 
+                                _fields="fqdn,id") 
+        if response.status_code in b1ddi.return_codes_ok:
+            if 'results' in response.json().keys():
+                zones = response.json()['results']
+                if len(zones) == 1:
+                    zone_id = zones[0]['id']
+                    log.debug("Zone ID: {} Found".format(zone_id))
+                else:
+                    log.warning("Too many results returned for zone {}"
+                                .format(zone))
+            else:
+                log.warning("No results returned for zone {}"
+                            .format(zone))
+                log.debug("Return code: {}".format(response.status_code))
+                log.debug("Return body: {}".format(response.text))
+        else:
+            log.error("--- Request for zone {} failed".format(zone))
+            log.debug("Return code: {}".format(response.status_code))
+            log.debug("Return body: {}".format(response.text))
+
+        # Create Records
+        if zone_id:
+            record_count = 0
+            network = ipaddress.ip_network(config['base_net'] + '/' + config['cidr'])
+            net_size = int(network.num_addresses) - 2
+            # Check we can fit no_of_records in network
+            if int(config['no_of_records']) > net_size:
+                no_of_records = net_size
+            else:
+                no_of_records = int(config['no_of_records'])
+
+            tag_body = create_tag_body(config['owner'])
+
+            # Generate records and add to zone
+            for n in range(1, (no_of_records + 1)):
+                hostname = "host" + str(n)
+                address = str(network.network_address + n)
+                body = ( '{"name_in_zone":"' + hostname + '",' +
+                         '"zone": "' + zone_id + '",' +
+                         '"type": "A", ' +
+                         '"rdata": {"address": "' + address + '"}, ' +
+                         '"options": {"create_ptr": true},' + 
+                         '"inheritance_sources": ' +
+                         '{"ttl": {"action": "inherit"}}, ' +
+                         tag_body + ' }' )
+                log.debug("Body: {}".format(body))         
+                response = b1ddi.create('/dns/record', body)
+                if response.status_code in b1ddi.return_codes_ok:
+                    log.info("Created record: {}.{} with IP {}"
+                             .format(hostname, zone, address))
+                    record_count += 1
+                else:
+                    log.warning("Failed to create record {}.{}"
+                                .format(hostname, zone))
+                    log.debug("Return code: {}".format(response.status_code))
+                    log.debug("Return body: {}".format(response.text))
+            if record_count == no_of_records:
+                log.info("+++ Successfully created {} DNS Records"
+                         .format(record_count))
+                status = True
+            else:
+                log.info("--- Only {} DNS Records created".format(record_count))
+                status = False
+        else:
+            log.warning("--- Unable to add records to zone {} in view {}"
+                        .format(zone,view))
+            status = False
+
+    else:
+        log.error("--- Request for id of view {} failed"
+                  .format(config['dns_view']))
+        log.debug("Return code: {}".format(response.status_code))
+        log.debug("Return body: {}".format(response.text))
+
+    return status
 
 
 def create_demo(b1ddi, config):
@@ -498,12 +677,24 @@ def create_demo(b1ddi, config):
     '''
     exitcode = 0
 
+    # Create IP Space
     if ip_space(b1ddi, config):
+        # Create network structure
         if create_networks(b1ddi, config):
             log.info("+++ Successfully Populated IP Space")
         else:
             log.error("--- Failed to create networks in {}"
                     .format(config['ip_space']))
+            exitcode = 1
+        # Create DNS View 
+        if create_dnsview(b1ddi, config):
+            if populate_dns(b1ddi, config):
+                log.info("+++ Successfully Populated DNS View")
+            else:
+                log.error("--- Failed to create zones in {}"
+                        .format(config['dns_view']))
+                exitcode = 1
+        else:
             exitcode = 1
     else:
         exitcode = 1
@@ -520,7 +711,7 @@ def clean_up(b1ddi, config):
         config (obj): ini config object
     
     Returns:
-        status (bool): True if successful
+        bool: True if successful
     '''
     exitcode = 0
 
@@ -530,17 +721,84 @@ def clean_up(b1ddi, config):
         log.info("Deleting IP_Space {}".format(config['ip_space']))
         response = b1ddi.delete('/ipam/ip_space', id=id)
         if response.status_code in b1ddi.return_codes_ok:
-            log.info("IP_Space {} deleted".format(config['ip_space']))
+            log.info("+++ IP_Space {} deleted".format(config['ip_space']))
         else:
-            log.warning("IP Space {} not deleted due to error".format(config['ip_space']))
+            log.warning("--- IP Space {} not deleted due to error".format(config['ip_space']))
             log.debug("Return code: {}".format(response.status_code))
             log.debug("Return body: {}".format(response.text))
             exitcode = 1
     else:
-        log.warning("IP Space {} not fonud.".format(config['ip_space']))
-        exitcode = 1
-    
+        log.warning("IP Space {} not fonud.".format(config['ip_space'])) 
+        exitcode = 1 
+
+    # Check for existence
+    id = b1ddi.get_id('/dns/view', key="name", value=config['dns_view'])
+    if id:
+        log.info("Cleaning up Zones for DNS View {}".format(config['dns_view']))
+        if clean_up_zones(b1ddi, id):
+            log.info("Deleting DNS View {}".format(config['dns_view']))
+            response = b1ddi.delete('/dns/view', id=id)
+            if response.status_code in b1ddi.return_codes_ok:
+                log.info("+++ DNS View {} deleted".format(config['dns_view']))
+            else:
+                log.warning("--- DNS View {} not deleted due to error".format(config['dns_view']))
+                log.debug("Return code: {}".format(response.status_code))
+                log.debug("Return body: {}".format(response.text))
+                exitcode = 1
+        else:
+            log.warning("Unable to clean-up zones in view {}".format(config['dns_view']))
+            exitcode = 1
+    else:
+        log.warning("DNS View {} not fonud.".format(config['dns_view'])) 
+        exitcode = 1 
+
     return exitcode
+
+
+def clean_up_zones(b1ddi, view_id):
+    '''
+    Clean up zones for specified view id
+
+    Parameters:
+
+    Returns:
+        bool: True if successful
+    '''
+    status = False
+    filter = 'view=="' + view_id + '"'
+    response = b1ddi.get('/dns/auth_zone', _filter=filter, _fields="fqdn,id")
+
+    if response.status_code in b1ddi.return_codes_ok:
+        if 'results' in response.json().keys():
+            zones = response.json()['results']
+            if len(zones):
+                for zone in zones:
+                    id = zone['id'].split('/')[2]
+                    log.info("Deleting zone {}".format(zone['fqdn']))
+                    r = b1ddi.delete('/dns/auth_zone', id=id)
+                    if r.status_code in b1ddi.return_codes_ok:
+                        log.info("+++ Zone {} deleted successfully"
+                                 .format(zone['fqdn']))
+                        status = True
+                    else:
+                        log.info("--- Zone {} not deleted".format(zone['fqdn']))
+                        log.debug("Return code: {}"
+                                  .format(response.status_code))
+                        log.debug("Return body: {}".format(response.text))
+                        status = False
+            else:
+                log.info("No zones present")
+                status = True
+        else:
+            log.info("No results for view")
+    else:
+        log.info("--- Unable to retrieve zones for view id = {}"
+                 .format(view_id))
+        log.debug("Return code: {}".format(response.status_code))
+        log.debug("Return body: {}".format(response.text))
+        status = False
+    
+    return status
 
 
 def check_config(config):
@@ -570,6 +828,9 @@ def check_config(config):
         config_ok = False
     elif subnet > 29:
         log.error("Subnet CIDR should be /29 or shorter: {}".format(subnet))
+        config_ok = False
+    elif  not config['no_of_ips']:
+        log.error("Key: no_of_ips not declared")
         config_ok = False
 
     return config_ok
