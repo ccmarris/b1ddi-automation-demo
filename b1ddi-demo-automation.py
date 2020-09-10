@@ -1,7 +1,6 @@
 #!/usr/local/bin/python3
 #vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 '''
-------------------------------------------------------------------------------------------------------------
 
  Description:
 
@@ -12,7 +11,7 @@
 
  Author: Chris Marrison
 
- Date Last Updated: 20200909
+ Date Last Updated: 20200910
 
  Todo:
     [ ] Too much to list
@@ -43,9 +42,8 @@
  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
 
-------------------------------------------------------------------------------------------------------------
 '''
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -62,7 +60,6 @@ import ipaddress
 
 # Global Variables
 log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
 # console_handler = logging.StreamHandler(sys.stdout)
 # log.addHandler(console_handler)
 
@@ -78,7 +75,7 @@ def parseargs():
     '''
     parse = argparse.ArgumentParser(description='SE Automation Demo - Create Demo')
     parse.add_argument('-o', '--output', action='store_true', 
-                        help="Ouput CSV and log to files <username>.csv and .log") 
+                        help="Ouput log to file <customer>.log") 
     parse.add_argument('-c', '--config', type=str, default='demo.ini',
                         help="Overide Config file")
     parse.add_argument('-d', '--debug', action='store_true', 
@@ -89,7 +86,7 @@ def parseargs():
     return parse.parse_args()
 
 
-def setup_logging(level, usefile=False):
+def setup_logging(debug=False, usefile=False):
     '''
      Set up logging
 
@@ -106,7 +103,7 @@ def setup_logging(level, usefile=False):
      #    logging.addLevelName(15, "advanced")
       #   logging.basicConfig(level=advanced,
        #                      format='%(asctime)s %(levelname)s: %(message)s')
-    if level == "debug":
+    if debug:
         logging.basicConfig(level=logging.DEBUG,
                             format='%(asctime)s %(levelname)s: %(message)s')
     else:
@@ -172,7 +169,7 @@ def read_demo_ini(ini_filename):
     # Local Variables
     cfg = configparser.ConfigParser()
     config = {}
-    ini_keys = [ 'owner', 'customer', 'postfix', 'tld', 'dns_view', 
+    ini_keys = [ 'b1inifile', 'owner', 'customer', 'postfix', 'tld', 'dns_view', 
                 'dns_domain', 'nsg', 'no_of_records', 'ip_space', 'base_net', 
                 'no_of_networks', 'no_of_ips', 'container_cidr', 'cidr' ]
 
@@ -469,7 +466,7 @@ def create_zones(b1ddi, config):
         # Check for NSG
         nsg = b1ddi.get_id('/dns/auth_nsg', 
                             key="name", 
-                            value="marrison-auto-demo", 
+                            value=config['nsg'],
                             include_path=True)
         if nsg:
             # Prepare Body
@@ -840,8 +837,6 @@ def main():
     Core Logic
     '''
     exitcode = 0
-    reports = {}
-    reportfile = None
     usefile = False
 
     args = parseargs()
@@ -850,28 +845,35 @@ def main():
 
     # Read inifile
     config = read_demo_ini(inifile)
+    if config['b1inifile']:
+        b1inifile = config['b1inifile']
+    else:
+        # Try to use inifile
+        b1inifile = inifile
 
     if len(config) > 0:
         # Check for file output
         if args.output:
-            outputprefix = config['username']
+            outputprefix = config['customer']
             usefile = True
 
         if usefile:
-            outfn = outputprefix + ".csv"
             logfn = outputprefix + ".log"
-            reportfile = open_file(outfn)
             hdlr = logging.FileHandler(logfn)
             log.addHandler(hdlr)
 
         if debug:
-            setup_logging("debug", usefile=usefile)
+            log.setLevel(logging.DEBUG)
+            setup_logging(debug=True, usefile=usefile)
         else:
-            setup_logging("normal", usefile=usefile)
+            log.setLevel(logging.INFO)
+            setup_logging(debug=False, usefile=usefile)
 
         log.info("====== B1DDI Automation Demo Version {} ======"
                 .format(__version__))
-        b1ddi = bloxone.b1ddi(inifile)
+
+        # Instatiate bloxone 
+        b1ddi = bloxone.b1ddi(b1inifile)
 
         if not args.remove:
             log.info("Checking config...")
