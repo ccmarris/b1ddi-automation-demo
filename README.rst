@@ -2,7 +2,7 @@
 B1DDI Demo Automation
 =====================
 
-Version: 0.2.0
+Version: 0.2.1
 Author: Chris Marrison
 Email: chris@infoblox.com
 
@@ -261,7 +261,7 @@ the configuration, whilst negative messages use "--- message". For example::
     INFO: +++ Range created in network 192.168.0.0/24
     INFO: --- Subnet 192.168.1.0/24 not created
 
-Example output can be found in the file *example1.log*.
+Example output can be found in the file *example1.txt*.
 
 In addition to the output to console the :option:`-o` or :option:`--out`
 can be used to create a <customer>.log file.
