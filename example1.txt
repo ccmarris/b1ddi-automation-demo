@@ -86,3 +86,18 @@ ns.b1ddilocal.infoblox.com. 28800 IN	A	192.168.0.31
 ;; MSG SIZE  rcvd: 114
 
 
+Clean-up demo:
+
+[marrison@vidar b1ddi-automation-demo]% ./b1ddi-demo-automation.py -c ~/configs/apj-demo.ini --remove 
+INFO:__main__:====== B1DDI Automation Demo Version 0.2.1 ======
+INFO:__main__:------ Cleaning Up Demo Data ------
+INFO:__main__:Deleting IP_Space marrison-zaphod-ip-space
+INFO:__main__:+++ IP_Space marrison-zaphod-ip-space deleted
+INFO:__main__:Cleaning up Zones for DNS View marrison-zaphod-view
+INFO:__main__:Deleting zone zaphod.com.
+INFO:__main__:+++ Zone zaphod.com. deleted successfully
+INFO:__main__:Deleting zone 168.192.in-addr.arpa.
+INFO:__main__:+++ Zone 168.192.in-addr.arpa. deleted successfully
+INFO:__main__:Deleting DNS View marrison-zaphod-view
+INFO:__main__:+++ DNS View marrison-zaphod-view deleted
+
