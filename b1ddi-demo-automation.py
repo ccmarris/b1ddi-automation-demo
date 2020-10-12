@@ -11,10 +11,9 @@
 
  Author: Chris Marrison
 
- Date Last Updated: 20200910
+ Date Last Updated: 20201012
 
  Todo:
-    [ ] Too much to list
 
  Copyright (c) 2020 Chris Marrison / Infoblox
 
@@ -43,7 +42,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 
 '''
-__version__ = '0.2.1'
+__version__ = '0.2.4'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -169,9 +168,10 @@ def read_demo_ini(ini_filename):
     # Local Variables
     cfg = configparser.ConfigParser()
     config = {}
-    ini_keys = [ 'b1inifile', 'owner', 'customer', 'postfix', 'tld', 'dns_view', 
-                'dns_domain', 'nsg', 'no_of_records', 'ip_space', 'base_net', 
-                'no_of_networks', 'no_of_ips', 'container_cidr', 'cidr' ]
+    ini_keys = [ 'b1inifile', 'owner', 'location', 'customer', 'postfix', 
+                'tld', 'dns_view', 'dns_domain', 'nsg', 'no_of_records', 
+                'ip_space', 'base_net', 'no_of_networks', 'no_of_ips', 
+                'container_cidr', 'cidr' ]
 
     # Attempt to read api_key from ini file
     try:
@@ -195,7 +195,7 @@ def read_demo_ini(ini_filename):
     return config
 
 
-def create_tag_body(owner, **params):
+def create_tag_body(config, **params):
     '''
     Add Owner tag and any others defined in **params
 
@@ -207,9 +207,14 @@ def create_tag_body(owner, **params):
         tags (str): JSON string to append to body
     '''
     now = datetime.datetime.now()  
-    datestamp = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+    datestamp = now.isoformat()
+    # datestamp = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+    owner = config['owner']
+    location = config['location']
+
     tags = {}
     tags.update({"Owner": owner})
+    tags.update({"Location": location})
     tags.update({"Usage": "AUTOMATION DEMO"})
     tags.update({"Created": datestamp})
 
@@ -241,7 +246,7 @@ def ip_space(b1ddi, config):
     # Check for existence
     if not b1ddi.get_id('/ipam/ip_space', key="name", value=config['ip_space']):
         log.info("---- Create IP Space ----")
-        tag_body = create_tag_body(config['owner'])
+        tag_body = create_tag_body(config)
         body = '{ "name": "' + config['ip_space'] + '",' + tag_body +' }'
         log.debug("Body:{}".format(body))
 
@@ -280,7 +285,7 @@ def create_networks(b1ddi, config):
     if space:
         log.info("IP Space id found: {}".format(space))
 
-        tag_body = create_tag_body(config['owner'])
+        tag_body = create_tag_body(config)
         base_net = config['base_net']
 
         # Create subnets
@@ -304,7 +309,7 @@ def create_networks(b1ddi, config):
             subnet_list = list(network.subnets(new_prefix=int(cidr)))
             if len(subnet_list) < int(config['no_of_networks']):
                 nets = len(subnet_list)
-                log.warn("Address block only supports {} subnets".format(nets))
+                log.warning("Address block only supports {} subnets".format(nets))
             else:
                 nets = int(config['no_of_networks'])
             log.info("~~~~ Creating {} subnets ~~~~".format(nets))
@@ -355,7 +360,7 @@ def populate_network(b1ddi, config, space, network):
     status = False
 
     log.info("~~~~ Creating Range ~~~~")
-    tag_body = create_tag_body(config['owner'])
+    tag_body = create_tag_body(config)
 
     net_size = network.num_addresses
     range_size = int(net_size / 2)
@@ -470,7 +475,7 @@ def create_zones(b1ddi, config):
                             include_path=True)
         if nsg:
             # Prepare Body
-            tag_body = create_tag_body(config['owner'])
+            tag_body = create_tag_body(config)
             zone = config['dns_domain']
             body = ( '{ "fqdn": "' + zone + '", "view": "' + view + '", ' 
                     + '"nsgs": ["' + nsg + '"], '
@@ -539,7 +544,7 @@ def create_dnsview(b1ddi, config):
     # Check for existence
     if not b1ddi.get_id('/dns/view', key="name", value=config['dns_view']):
         log.info("---- Create DNS View ----")
-        tag_body = create_tag_body(config['owner'])
+        tag_body = create_tag_body(config)
         body = '{ "name": "' + config['dns_view'] + '",' + tag_body +' }'
         log.debug("Body:{}".format(body))
 
@@ -614,7 +619,7 @@ def add_records(b1ddi, config):
             else:
                 no_of_records = int(config['no_of_records'])
 
-            tag_body = create_tag_body(config['owner'])
+            tag_body = create_tag_body(config)
 
             # Generate records and add to zone
             for n in range(1, (no_of_records + 1)):
@@ -683,15 +688,16 @@ def create_demo(b1ddi, config):
             log.error("--- Failed to create networks in {}"
                     .format(config['ip_space']))
             exitcode = 1
-        # Create DNS View 
-        if create_dnsview(b1ddi, config):
-            if populate_dns(b1ddi, config):
-                log.info("+++ Successfully Populated DNS View")
-            else:
-                log.error("--- Failed to create zones in {}"
-                        .format(config['dns_view']))
-                exitcode = 1
+    else:
+        exitcode = 1
+
+    # Create DNS View 
+    if create_dnsview(b1ddi, config):
+        if populate_dns(b1ddi, config):
+            log.info("+++ Successfully Populated DNS View")
         else:
+            log.error("--- Failed to create zones in {}"
+                    .format(config['dns_view']))
             exitcode = 1
     else:
         exitcode = 1
@@ -881,6 +887,10 @@ def main():
                 log.info("Config checked out proceeding...")
                 log.info("------ Creating Demo Data ------")
                 exitcode = create_demo(b1ddi, config)
+                log.info("---------------------------------------------------")
+                log.info("Please remember to clean up when you have finished:")
+                command = '$ ' + ' '.join(sys.argv) + " --remove"
+                log.info("{}".format(command)) 
             else:
                 log.error("Config {} contains errors".format(inifile))
                 exitcode = 3

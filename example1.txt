@@ -1,7 +1,8 @@
 Running the script, showing log output:
 
-[marrison@vidar b1ddi-automation-demo]% ./b1ddi-demo-automation.py -c ~/configs/apj-demo.ini 
-INFO:__main__:====== B1DDI Automation Demo Version 0.2.1 ======
+% ./b1ddi-demo-automation.py -c ~/configs/apj-demo.ini 
+
+INFO:__main__:====== B1DDI Automation Demo Version 0.2.4 ======
 INFO:__main__:Checking config...
 INFO:__main__:Config checked out proceeding...
 INFO:__main__:------ Creating Demo Data ------
@@ -9,7 +10,7 @@ INFO:__main__:---- Create IP Space ----
 INFO:__main__:Creating IP_Space marrison-zaphod-ip-space
 INFO:__main__:IP_Space marrison-zaphod-ip-space Created
 INFO:__main__:---- Create Address Block and subnets ----
-INFO:__main__:IP Space id found: ipam/ip_space/e6969669-f421-11ea-970c-8e7b0d836aa1
+INFO:__main__:IP Space id found: ipam/ip_space/38b941b5-098a-11eb-baaa-26b14d489ac1
 INFO:__main__:~~~~ Creating Addresses block 192.168.0.0/16~~~~ 
 INFO:__main__:+++ Address block 192.168.0.0/16 created
 INFO:__main__:~~~~ Creating 2 subnets ~~~~
@@ -36,7 +37,7 @@ INFO:__main__:---- Create DNS View ----
 INFO:__main__:Creating DNS View marrison-zaphod-view
 INFO:__main__:DNS View marrison-zaphod-view Created
 INFO:__main__:---- Create Forward & Reverse Zones ----
-INFO:__main__:DNS View id found: dns/view/8746989a-f0cc-4144-91dd-18e5fc02d8c0
+INFO:__main__:DNS View id found: dns/view/38af1936-8510-449b-915b-5efe2ec6da0a
 INFO:__main__:+++ Zone zaphod.com created in view
 INFO:__main__:+++ Zone 168.192.in-addr.arpa. created in view
 INFO:__main__:Created record: host1.zaphod.com with IP 192.168.0.1
@@ -52,44 +53,13 @@ INFO:__main__:Created record: host10.zaphod.com with IP 192.168.0.10
 INFO:__main__:+++ Successfully created 10 DNS Records
 INFO:__main__:+++ Records added to zones
 INFO:__main__:+++ Successfully Populated DNS View
+INFO:__main__:---------------------------------------------------
+INFO:__main__:Please remember to clean up when you have finished:
+INFO:__main__:$ ./b1ddi-demo-automation.py -c /Users/marrison/configs/demo.ini --remove
 
+% ./b1ddi-demo-automation.py -c ~/configs/demo.ini --remove
 
-
-If you have configured an NSG with an active OPH:
-
-[marrison@vidar b1ddi-automation-demo]% dig @192.168.0.31 host1.zaphod.com
-
-; <<>> DiG 9.10.6 <<>> @192.168.0.31 host1.zaphod.com
-; (1 server found)
-;; global options: +cmd
-;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 22908
-;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
-
-;; OPT PSEUDOSECTION:
-; EDNS: version: 0, flags:; udp: 4096
-;; QUESTION SECTION:
-;host1.zaphod.com.		IN	A
-
-;; ANSWER SECTION:
-host1.zaphod.com.	28800	IN	A	192.168.0.1
-
-;; AUTHORITY SECTION:
-zaphod.com.		28800	IN	NS	ns.b1ddilocal.infoblox.com.
-
-;; ADDITIONAL SECTION:
-ns.b1ddilocal.infoblox.com. 28800 IN	A	192.168.0.31
-
-;; Query time: 43 msec
-;; SERVER: 192.168.0.31#53(192.168.0.31)
-;; WHEN: Fri Sep 11 12:31:31 BST 2020
-;; MSG SIZE  rcvd: 114
-
-
-Clean-up demo:
-
-[marrison@vidar b1ddi-automation-demo]% ./b1ddi-demo-automation.py -c ~/configs/apj-demo.ini --remove 
-INFO:__main__:====== B1DDI Automation Demo Version 0.2.1 ======
+INFO:__main__:====== B1DDI Automation Demo Version 0.2.4 ======
 INFO:__main__:------ Cleaning Up Demo Data ------
 INFO:__main__:Deleting IP_Space marrison-zaphod-ip-space
 INFO:__main__:+++ IP_Space marrison-zaphod-ip-space deleted
@@ -100,4 +70,3 @@ INFO:__main__:Deleting zone 168.192.in-addr.arpa.
 INFO:__main__:+++ Zone 168.192.in-addr.arpa. deleted successfully
 INFO:__main__:Deleting DNS View marrison-zaphod-view
 INFO:__main__:+++ DNS View marrison-zaphod-view deleted
-

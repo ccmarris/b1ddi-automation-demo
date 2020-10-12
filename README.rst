@@ -2,25 +2,25 @@
 B1DDI Demo Automation
 =====================
 
-Version: 0.2.1
+Version: 0.2.4
 Author: Chris Marrison
 Email: chris@infoblox.com
 
 Description
 -----------
 
-These -set of- script-s- are designed to simplify and standardise the use of
-the Bloxone Infoblox SE organisations for the purposes of providing customer
-demos of the GUI and the power of automation using BloxOne DDI.
+This script is designed to provide a standard, simple way to demonstrate
+the power of automation with the Bloxone DDI platform and create a set of 
+demo data for demonstration of the GUI.
 
-This includes the creation of a 'demo' set of data and the clean up (removal)
-of this demo data once you have finished wth the demonstrations.
+This includes the the clean up (removal) of this demo data once the
+demonstration is complete.
 
 To simplify configuration and allow for user and customer specific
 customisation, the scripts utilise a simple ini file that can be edited with
 your favourite text editor.
 
-The scripts have specifically been written in a *functional* manor to make them
+The script has specifically been written in a *functional* manor to make them
 simple to understand.
 
 
@@ -28,6 +28,46 @@ Prerequisites
 -------------
 
 Python 3.6 or above
+
+
+Installing Python
+~~~~~~~~~~~~~~~~~
+
+You can install the latest version of Python 3.x by downloading the appropriate
+installer for your system from `python.org <https://python.org>`_.
+
+.. note::
+
+  If you are running MacOS Catalina (or later) Python 3 comes pre-installed.
+  Previous versions only come with Python 2.x by default and you will therefore
+  need to install Python 3 as above or via Homebrew, Ports, etc.
+
+  By default the python command points to Python 2.x, you can check this using 
+  the command::
+
+    $ python -V
+
+  To specifically run Python 3, use the command::
+
+    $ python3
+
+
+.. important::
+
+  Mac users will need the xcode command line utilities installed to use pip3,
+  etc. If you need to install these use the command::
+
+    $ xcode-select --install
+
+.. note::
+
+  If you are installing Python on Windows, be sure to check the box to have 
+  Python added to your PATH if the installer offers such an option 
+  (it's normally off by default).
+
+
+Modules
+~~~~~~~
 
 Non-standard modules:
 
@@ -46,9 +86,12 @@ Complete list of modules::
 
     import bloxone
     import os
+    import sys
     import json
     import argparse
     import logging
+    import datetime
+    import ipaddress
 
 
 Basic Configuration
@@ -61,7 +104,7 @@ customer specific demo configurations. This helps you maintain a single copy
 of your API key that is referenced by multiple demo configurations.
 
 This also allows you to keep copies of what was demonstrated for a particular
-customer or where appropriate use different bloxone accounts easily.
+customer or purpose and where appropriate use different bloxone accounts easily.
 
 A sample inifile for the bloxone module is shared as *bloxone.ini* and follows
 the following format provided below::
@@ -71,8 +114,8 @@ the following format provided below::
     api_version = 'v1'
     api_key = '<you API Key here>'
 
-You can therefore simply add your API, and this is ready for the bloxone module
-used by the automation demo script.
+You can therefore simply add your API Key, and this is ready for the bloxone
+module used by the automation demo script.
 
 A template is also provided for the demo script inifile *demo.ini*. Unless an
 alternative is specified on the command line, the script will automatically use
@@ -88,6 +131,7 @@ The format of the demo ini file is::
 
     # User and customer details
     owner = <username>
+    location = <location info>
     customer = <customer name>
 
     # Alternate postfix configuration
@@ -113,6 +157,7 @@ Once your API key is configured in the bloxone.ini, and your username and
 customer name are set it is possible to run the scripts with the remaining
 defaults or tweak as you need!
 
+
 .. note:: 
 
     As can be seen the demo inifile references the bloxone.ini file by default
@@ -124,7 +169,8 @@ defaults or tweak as you need!
 
 The demo ini file is used to form the naming conventions and
 Owner tagging to both ensure that it is easy to identify who the demo data
-belongs to and ensure this is identified by automated clean-up scripts.
+belongs to and ensure this is identified by automated clean-up scripts within
+the Infoblox demo environments.
 
 You can customise the number of networks, subnet masks, and the first base 
 network for the auto created demo data, as well as, the number of ips and 
@@ -143,11 +189,16 @@ population of an On Prem Host for DNS.
 
 .. important::
 
-    Since a zone requires an On Prem Host to be defined, the generic NSG has an
-    associated On Prem Host that is not in use. Please do not try to use or
-    modify either the On Prem Host or the NSG as this may affect other peoples
-    ability to perform demonstrations. Please create your own and customise your
-    inifile appropriately.
+    The default bloxone.ini and script assumes that the b1ddi-auto-demo
+    DNS Server Group (NSG) already exists. If you are running outside of Infoblox 
+    you will need to create this NSG, or specify an alternative. This requires
+    an On Prem Host to be assigned to the NSG.
+
+    Within Infoblox, the default NSG has an associated On Prem Host that is not
+    in use. Please do not try to use or modify either the On Prem Host or the
+    NSG as this may affect other peoples ability to perform demonstrations.
+    Please create your own and customise your inifile appropriately.
+
 
 
 Usage
@@ -166,7 +217,7 @@ The script supports -h or --help on the command line to access the options avail
     optional arguments:
     -h, --help            show this help message and exit
     -c CONFIG, --config CONFIG
-                            Overide Config file
+                          Overide Config file
     -d, --debug           Enable debug messages
     -r, --remove          Clean-up demo data
     
@@ -179,7 +230,7 @@ becomes very simple to run with effectively two modes:
 To run in create mode, simply point the script at the appropriate ini fle as required.
 For example::
 
-    % ./b1ddi-demo-automation.py
+    % ./b1ddi-demo-automation.py OR python3 b1ddi-demo-automation.py
     % ./b1ddi-demo-automation.py -c <path to inifile>
     % ./b1ddi-demo-automation.py -c ~/configs/customer.ini
     
@@ -203,7 +254,7 @@ To run in clean-up mode simply add *--remove* or *-r* to the command line::
 
 
 The details
------------
+~~~~~~~~~~~
 
 In create mode the script creates an IP Space with an address block, subnets are then 
 created wth ranges and IP reservations. These are based on the following elements in 
@@ -239,12 +290,12 @@ These are controlled by the following keys in the ini file::
 
 .. note::
     
-    The script will create and appropriate number of A and PTR records
+    The script will create an appropriate number of A and PTR records
     based on the *no_of_records* or the 'size' of the base network, which
     ever is the smaller number.
 
 Output
-------
+~~~~~~
 
 Section headers are represented using::
 
@@ -276,4 +327,4 @@ Aknowledgements
 ---------------
 
 Thanks to the BloxOne DDI SME Team, and others, for beta testing and providing
-feedback prior to releasing this on the rest of you.
+feedback prior to releasing this to the wild.
