@@ -42,7 +42,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 
 '''
-__version__ = '0.2.5'
+__version__ = '0.2.6'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -172,7 +172,7 @@ def read_demo_ini(ini_filename):
     ini_keys = [ 'b1inifile', 'owner', 'location', 'customer', 'postfix', 
                 'tld', 'dns_view', 'dns_domain', 'nsg', 'no_of_records', 
                 'ip_space', 'base_net', 'no_of_networks', 'no_of_ips', 
-                'container_cidr', 'cidr' ]
+                'container_cidr', 'cidr', 'net_comments']
 
     # Attempt to read api_key from ini file
     try:
@@ -278,7 +278,8 @@ def create_networks(b1ddi, config):
         status (bool): True if successful
     '''
     status = False
-    net_comments = ['Office Network', 'VoIP Network', 'POS Network', 'Guest WiFI', 'IoT Network']
+    net_comments = config['net_comments'].split(',')
+    print(net_comments[1])
 
     # Get id of ip_space
     log.info("---- Create Address Block and subnets ----")
@@ -295,6 +296,7 @@ def create_networks(b1ddi, config):
         body = ( '{ "address": "' + base_net + '", '
                 + '"cidr": "' + cidr + '", '
                 + '"space": "' + space + '", '
+                + '"comment": "Internal Address Allocation", '
                 + tag_body + ' }' )
         log.debug("Body:{}".format(body))
         log.info("~~~~ Creating Addresses block {}/{}~~~~ "
