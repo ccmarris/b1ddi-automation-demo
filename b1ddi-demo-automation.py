@@ -42,7 +42,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 
 '''
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -55,6 +55,7 @@ import argparse
 import configparser
 import datetime
 import ipaddress
+import random
 
 
 # Global Variables
@@ -277,6 +278,7 @@ def create_networks(b1ddi, config):
         status (bool): True if successful
     '''
     status = False
+    net_comments = ['Office Network', 'VoIP Network', 'POS Network', 'Guest WiFI', 'IoT Network']
 
     # Get id of ip_space
     log.info("---- Create Address Block and subnets ----")
@@ -315,9 +317,11 @@ def create_networks(b1ddi, config):
             log.info("~~~~ Creating {} subnets ~~~~".format(nets))
             for n in range(nets):
                 address = str(subnet_list[n].network_address)
+                comment = net_comments[random.randrange(0,len(net_comments))]
                 body = ( '{ "address": "' + address + '", '
                         + '"cidr": "' + cidr + '", '
                         + '"space": "' + space + '", '
+                        + '"comment": "' + comment + '", '
                         + tag_body + ' }' )
                 log.debug("Body:{}".format(body))
                 log.info("Creating Subnet {}/{}".format(address, cidr))
