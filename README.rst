@@ -2,7 +2,7 @@
 B1DDI Demo Automation
 =====================
 
-Version: 0.2.4
+Version: 0.2.6
 Author: Chris Marrison
 Email: chris@infoblox.com
 
@@ -151,6 +151,7 @@ The format of the demo ini file is::
     base_net = 192.168.0.0
     container_cidr = 16
     cidr = 24
+    net_comments = Office Network, VoIP Network, POS Network, Guest WiFI, IoT Network
 
 
 Once your API key is configured in the bloxone.ini, and your username and
@@ -266,6 +267,7 @@ the ini file::
     no_of_ips = 5
     container_cidr = 16
     cidr = 24
+    net_comments = Office Network, VoIP Network, POS Network, Guest WiFI, IoT Network
 
 The ranges will effectively take up the top 50% of the subnet, whilst the number
 of IP reservations is ether be the *no_of_ips* or 25% of the subnet, which ever
@@ -274,6 +276,12 @@ is the smaller number.
 Configuration checking is performed to confirm that *base_net* is a valid IPv4
 address and both *container_cidr* and *cidr* are suitable and larger than a 
 /28 and /29 respectively.
+
+Subnet are created with a "Comment/Description" that is randomly assigned from 
+the list of descriptions in *net_comments*. A default set is included in the 
+example *demo.ini* file, however, this can be customised as needed. The number
+of descriptions is not fixed to the five examples so you can include more or 
+less descriptions as needed - this is just a sample set.
 
 A DNS View is then also created with an authoritative forward lookup zone and
 /16 reverse lookup zone for the *base_net* (adjusted for byte boundaries). These
