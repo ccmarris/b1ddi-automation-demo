@@ -279,7 +279,6 @@ def create_networks(b1ddi, config):
     '''
     status = False
     net_comments = config['net_comments'].split(',')
-    print(net_comments[1])
 
     # Get id of ip_space
     log.info("---- Create Address Block and subnets ----")
