@@ -210,8 +210,8 @@ data sets.
 
 The script supports -h or --help on the command line to access the options available::
 
-    $ ./b1ddi-demo-automation.py --help
-    usage: b1ddi-demo-automation.py [-h] [-c CONFIG] [-d] [-r]
+    $ ./b1ddi_demo_automation.py --help
+    usage: b1ddi_demo_automation.py [-h] [-c CONFIG] [-d] [-r]
 
     SE Automation Demo - Create Demo
 
@@ -231,15 +231,15 @@ becomes very simple to run with effectively two modes:
 To run in create mode, simply point the script at the appropriate ini fle as required.
 For example::
 
-    % ./b1ddi-demo-automation.py OR python3 b1ddi-demo-automation.py
-    % ./b1ddi-demo-automation.py -c <path to inifile>
-    % ./b1ddi-demo-automation.py -c ~/configs/customer.ini
+    % ./b1ddi_demo_automation.py OR python3 b1ddi-demo-automation.py
+    % ./b1ddi_demo_automation.py -c <path to inifile>
+    % ./b1ddi_demo_automation.py -c ~/configs/customer.ini
     
 To run in clean-up mode simply add *--remove* or *-r* to the command line::
 
-    % ./b1ddi-demo-automation.py --remove
-    % ./b1ddi-demo-automation.py -c <path to inifile> --remove
-    % ./b1ddi-demo-automation.py -c ~/configs/customer.ini --remove
+    % ./b1ddi_demo_automation.py --remove
+    % ./b1ddi_demo_automation.py -c <path to inifile> --remove
+    % ./b1ddi_demo_automation.py -c ~/configs/customer.ini --remove
 
 .. note::
 
