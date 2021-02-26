@@ -42,7 +42,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 
 '''
-__version__ = '0.2.6'
+__version__ = '0.2.7'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -208,8 +208,8 @@ def create_tag_body(config, **params):
         tags (str): JSON string to append to body
     '''
     now = datetime.datetime.now()  
-    datestamp = now.isoformat()
-    # datestamp = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+    # datestamp = now.isoformat()
+    datestamp = now.strftime('%Y-%m-%dT%H:%MZ')
     owner = config['owner']
     location = config['location']
 
