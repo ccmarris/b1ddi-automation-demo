@@ -11,7 +11,7 @@
 
  Author: Chris Marrison
 
- Date Last Updated: 20201012
+ Date Last Updated: 20210509
 
  Todo:
 
@@ -42,7 +42,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 
 '''
-__version__ = '0.2.7'
+__version__ = '0.2.8'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -56,6 +56,7 @@ import configparser
 import datetime
 import ipaddress
 import random
+import time
 
 
 # Global Variables
@@ -891,8 +892,11 @@ def main():
             if check_config(config):
                 log.info("Config checked out proceeding...")
                 log.info("------ Creating Demo Data ------")
+                start_timer = time.perf_counter()
                 exitcode = create_demo(b1ddi, config)
+                end_timer = time.perf_counter() - start
                 log.info("---------------------------------------------------")
+                log.info(f'Demo data created in {end_timer:0.2f}S')
                 log.info("Please remember to clean up when you have finished:")
                 command = '$ ' + ' '.join(sys.argv) + " --remove"
                 log.info("{}".format(command)) 
@@ -901,7 +905,11 @@ def main():
                 exitcode = 3
         elif args.remove:
             log.info("------ Cleaning Up Demo Data ------")
+            start_timer = time.perf_counter()
             exitcode = clean_up(b1ddi, config)
+            end_timer = time.perf_counter() - start
+            log.info("---------------------------------------------------")
+            log.info(f'Demo data created in {end_timer:0.2f}S')
         else:
             log.error("Script Error - something seriously wrong")
             exitcode = 99

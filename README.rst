@@ -2,7 +2,7 @@
 B1DDI Demo Automation
 =====================
 
-Version: 0.2.7
+Version: 0.2.8
 Author: Chris Marrison
 Email: chris@infoblox.com
 
