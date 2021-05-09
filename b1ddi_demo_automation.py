@@ -42,7 +42,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 
 '''
-__version__ = '0.2.8'
+__version__ = '0.2.9'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -894,7 +894,7 @@ def main():
                 log.info("------ Creating Demo Data ------")
                 start_timer = time.perf_counter()
                 exitcode = create_demo(b1ddi, config)
-                end_timer = time.perf_counter() - start
+                end_timer = time.perf_counter() - start_timer
                 log.info("---------------------------------------------------")
                 log.info(f'Demo data created in {end_timer:0.2f}S')
                 log.info("Please remember to clean up when you have finished:")
@@ -909,7 +909,7 @@ def main():
             exitcode = clean_up(b1ddi, config)
             end_timer = time.perf_counter() - start_timer
             log.info("---------------------------------------------------")
-            log.info(f'Demo data created in {end_timer:0.2f}S')
+            log.info(f'Demo data removed in {end_timer:0.2f}S')
         else:
             log.error("Script Error - something seriously wrong")
             exitcode = 99
