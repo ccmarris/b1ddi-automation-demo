@@ -907,7 +907,7 @@ def main():
             log.info("------ Cleaning Up Demo Data ------")
             start_timer = time.perf_counter()
             exitcode = clean_up(b1ddi, config)
-            end_timer = time.perf_counter() - start
+            end_timer = time.perf_counter() - start_timer
             log.info("---------------------------------------------------")
             log.info(f'Demo data created in {end_timer:0.2f}S')
         else:
