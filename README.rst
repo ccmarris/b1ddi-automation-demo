@@ -6,9 +6,9 @@ Version: 0.2.9
 Author: Chris Marrison
 Email: chris@infoblox.com
 
-Note::
+.. note::
 
-This tool is deprecated and has been replaced with the `bloxone_automation_tools <https://github.com/ccmarris/bloxone_automation_tools>`_.
+  This tool is deprecated and has been replaced with the `bloxone_automation_tools <https://github.com/ccmarris/bloxone_automation_tools>`_.
 
 
 Description
